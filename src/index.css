@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    /* faint washi grain — signature paper texture, kept subtle */
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(154, 123, 63, 0.035) 0, transparent 45%),
+      radial-gradient(circle at 80% 60%, rgba(42, 74, 99, 0.035) 0, transparent 40%);
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-serif;
+  }
+
+  :focus-visible {
+    outline: 2px solid #2a4a63;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@layer components {
+  /* vertical writing eyebrow labels (縦書き) */
+  .vtext {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 0.18em;
+  }
+
+  .hairline {
+    @apply border border-line;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* custom scrollbar for a tidy台帳 feel */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cfc9b8;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b9b29d;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
