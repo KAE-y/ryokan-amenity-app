@@ -37,8 +37,6 @@ export interface Area {
   photoUrl: string
   /** 置くべき備品・セッティングルール（本文テキスト） */
   settingRule: string
-  /** 紐づく備品名の一覧 */
-  amenities: string[]
 }
 
 /** 部屋タイプ */

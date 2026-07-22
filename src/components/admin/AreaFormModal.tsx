@@ -31,7 +31,6 @@ export function AreaFormModal({
   const [y, setY] = useState(50)
   const [photoUrl, setPhotoUrl] = useState('')
   const [settingRule, setSettingRule] = useState('')
-  const [amenitiesText, setAmenitiesText] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -40,7 +39,6 @@ export function AreaFormModal({
     setY(editing?.y ?? draft?.y ?? 50)
     setPhotoUrl(editing?.photoUrl ?? '')
     setSettingRule(editing?.settingRule ?? '')
-    setAmenitiesText((editing?.amenities ?? []).join('\n'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -48,17 +46,12 @@ export function AreaFormModal({
 
   const save = () => {
     if (!canSave) return
-    const amenities = amenitiesText
-      .split('\n')
-      .map((s) => s.trim())
-      .filter(Boolean)
     const data = {
       name: name.trim(),
       x: clampPct(x),
       y: clampPct(y),
       photoUrl: photoUrl.trim(),
       settingRule: settingRule.trim(),
-      amenities,
     }
     if (editing) updateArea(roomId, editing.id, data)
     else addArea(roomId, data)
@@ -128,15 +121,6 @@ export function AreaFormModal({
             value={settingRule}
             onChange={(e) => setSettingRule(e.target.value)}
             placeholder="置くべき備品や整え方を記入…"
-          />
-        </Field>
-
-        <Field label="紐づく備品" hint="1行に1つ">
-          <TextArea
-            rows={4}
-            value={amenitiesText}
-            onChange={(e) => setAmenitiesText(e.target.value)}
-            placeholder={'歯ブラシ ×2\nフェイスタオル ×2'}
           />
         </Field>
       </div>

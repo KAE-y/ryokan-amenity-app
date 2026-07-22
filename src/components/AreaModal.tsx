@@ -37,25 +37,6 @@ function AreaPhoto({ url, name }: { url: string; name: string }) {
   )
 }
 
-function AreaDetailItems({ labels }: { labels: string[] }) {
-  return (
-    <section>
-      <Eyebrow>このエリアの備品</Eyebrow>
-      {labels && labels.length > 0 ? (
-        <div className="mt-3 space-y-2">
-          {labels.map((item, index) => (
-            <div key={index} className="rounded-2xl border border-line bg-white/90 px-4 py-3 text-sm text-ink">
-              {item}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-2 text-sm text-ink-soft">このエリアには登録された備品がありません。</p>
-      )}
-    </section>
-  )
-}
-
 function AreaAmenities({ areaId, showEmpty = true }: { areaId: string; showEmpty?: boolean }) {
   const { rooms } = useRooms()
   const room = rooms.find((r) => r.areas.some((ar) => ar.id === areaId))
@@ -65,7 +46,7 @@ function AreaAmenities({ areaId, showEmpty = true }: { areaId: string; showEmpty
     if (!showEmpty) return null
     return (
       <section>
-        <Eyebrow>置いてある備品</Eyebrow>
+        <Eyebrow>備品詳細</Eyebrow>
         <p className="mt-2 text-sm text-ink-soft">このエリアには登録された備品がありません。</p>
       </section>
     )
@@ -73,7 +54,7 @@ function AreaAmenities({ areaId, showEmpty = true }: { areaId: string; showEmpty
 
   return (
     <section>
-      <Eyebrow>置いてある備品</Eyebrow>
+      <Eyebrow>備品詳細</Eyebrow>
       <div className="mt-3 space-y-3">
         {items.map((a) => (
           <div key={a.id} className="rounded-2xl border border-line bg-white/90 p-3 shadow-sm">
@@ -111,9 +92,7 @@ export function AreaModal({ area, onClose }: { area: Area | null; onClose: () =>
                 {area.settingRule || '詳細は登録されていません。'}
               </p>
             </section>
-            <AreaDetailItems labels={area.amenities} />
-            {/** Show amenities that have areaId === area.id */}
-            <AreaAmenities areaId={area.id} showEmpty={false} />
+            <AreaAmenities areaId={area.id} />
           </div>
         </>
       )}
