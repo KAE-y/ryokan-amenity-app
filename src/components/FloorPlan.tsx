@@ -35,18 +35,22 @@ export function FloorPlan({
   const [imgFailed, setImgFailed] = useState(false)
   const [floorPlanSrc, setFloorPlanSrc] = useState(() => resolveImageUrl(room.floorPlanImageUrl))
   const [imgRatio, setImgRatio] = useState<number | null>(null)
+  // 失敗済みのURLを覚えておき、2つの形式を無限に往復しないようにする
+  const triedUrls = useRef<Set<string>>(new Set())
 
   // 間取り図URLが変わったら表示を追従させる（失敗状態・実寸比もリセット）
   useEffect(() => {
+    triedUrls.current = new Set()
     setFloorPlanSrc(resolveImageUrl(room.floorPlanImageUrl))
     setImgFailed(false)
     setImgRatio(null)
   }, [room.floorPlanImageUrl])
 
-  // 画像の読み込みに失敗した場合：ドライブの直リンクならサムネイル形式を試し、それも駄目なら簡易間取り図へ
+  // 画像の読み込みに失敗した場合：ドライブの別形式を試し、それも駄目なら簡易間取り図へ
   const handleImageError = () => {
+    triedUrls.current.add(floorPlanSrc)
     const alt = alternateDriveImageUrl(floorPlanSrc)
-    if (alt) {
+    if (alt && !triedUrls.current.has(alt)) {
       setFloorPlanSrc(alt)
     } else {
       setImgFailed(true)

@@ -52,28 +52,36 @@ const isDirectImageUrl = (url: string): boolean => /\.(jpe?g|png|gif|webp|svg|bm
 /**
  * 画像URLを、そのまま<img>に渡せる形式に正規化する。
  * ・すでに画像ファイルへの直リンク（.jpg / .png など）ならそのまま返す。
- * ・Googleドライブの共有リンク（.../file/d/FILE_ID/view や ?id=FILE_ID など）は、
- *   ファイルIDを取り出して画像直リンク形式（lh3.googleusercontent.com）に変換する。
+ * ・Googleドライブの共有リンク（.../file/d/FILE_ID/view、?id=FILE_ID、
+ *   すでに lh3.googleusercontent.com/d/FILE_ID 形式のものも含む）は、
+ *   ファイルIDを取り出してGoogle公式の thumbnail API 形式に変換する
+ *   （lh3.googleusercontent.com は非公式な裏技で、環境によって読み込めないことがあるため）。
  * ・上記のいずれでもない場合や、IDを抽出できない場合は入力をそのまま返す（エラーにしない）。
  */
 export const resolveImageUrl = (url: string): string => {
   const trimmed = url.trim()
   if (!trimmed) return trimmed
   if (isDirectImageUrl(trimmed)) return trimmed
-  if (!/drive\.google\.com/.test(trimmed)) return trimmed
 
   const fileId =
-    trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] ??
-    trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1]
+    trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] ??
+    trimmed.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/)?.[1] ??
+    trimmed.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/)?.[1]
 
-  return fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : trimmed
+  return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w2000` : trimmed
 }
 
 /**
- * Googleドライブの画像直リンク（lh3.googleusercontent.com/d/形式）の読み込みに失敗した場合の
- * 代替URL（サムネイルAPI）を返す。ドライブの直リンクでなければ null（＝これ以上変換できない）。
+ * Googleドライブ画像の読み込みに失敗した場合の代替URL（別形式）を返す。
+ * thumbnail API 形式で失敗した場合は lh3.googleusercontent.com 形式を、
+ * その逆に失敗した場合は thumbnail API 形式を試す。どちらでもなければ null。
  */
 export const alternateDriveImageUrl = (url: string): string | null => {
-  const fileId = url.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/)?.[1]
-  return fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : null
+  const thumbFileId = url.match(/drive\.google\.com\/thumbnail\?id=([a-zA-Z0-9_-]+)/)?.[1]
+  if (thumbFileId) return `https://lh3.googleusercontent.com/d/${thumbFileId}`
+
+  const lh3FileId = url.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/)?.[1]
+  if (lh3FileId) return `https://drive.google.com/thumbnail?id=${lh3FileId}&sz=w2000`
+
+  return null
 }

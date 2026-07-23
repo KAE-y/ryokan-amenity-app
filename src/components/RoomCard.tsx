@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { RoomType } from '../types'
 import { alternateDriveImageUrl, cx, resolveImageUrl, roomFullName } from '../utils'
 import { Button, IconCamera, IconPencil, IconTrash, TextInput } from './ui'
@@ -27,9 +27,12 @@ export function RoomCard({
   const [photoSrc, setPhotoSrc] = useState(() =>
     room.photoUrl ? resolveImageUrl(room.photoUrl) : fallbackPhotoUrl(room),
   )
+  // 失敗済みのURLを覚えておき、2つの形式を無限に往復しないようにする
+  const triedUrls = useRef<Set<string>>(new Set())
 
   // 保存された写真URLが変わったら表示を追従させる（失敗時のフォールバック状態もリセット）
   useEffect(() => {
+    triedUrls.current = new Set()
     setPhotoSrc(room.photoUrl ? resolveImageUrl(room.photoUrl) : fallbackPhotoUrl(room))
   }, [room])
 
@@ -44,7 +47,12 @@ export function RoomCard({
 
   // 画像の読み込みに失敗した場合：ドライブの直リンクならサムネイル形式を試し、それも駄目ならプレースホルダーへ
   const handlePhotoError = () => {
-    setPhotoSrc((current) => alternateDriveImageUrl(current) ?? fallbackPhotoUrl(room))
+    setPhotoSrc((current) => {
+      triedUrls.current.add(current)
+      const alt = alternateDriveImageUrl(current)
+      if (alt && !triedUrls.current.has(alt)) return alt
+      return fallbackPhotoUrl(room)
+    })
   }
 
   return (
