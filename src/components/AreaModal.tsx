@@ -40,7 +40,7 @@ function AreaPhoto({ url, name }: { url: string; name: string }) {
 function AreaAmenities({ areaId, showEmpty = true }: { areaId: string; showEmpty?: boolean }) {
   const { rooms } = useRooms()
   const room = rooms.find((r) => r.areas.some((ar) => ar.id === areaId))
-  const items = room ? room.amenities.filter((am) => am.areaId === areaId) : []
+  const items = room ? room.amenities.filter((am) => am.areaIds.includes(areaId)) : []
 
   if (!items || items.length === 0) {
     if (!showEmpty) return null

@@ -53,9 +53,26 @@ async function saveRoomsToSupabase(rooms: RoomType[]): Promise<void> {
  * 旧形式（name のみの文字列項目）のデータを新形式（name/count/detail）へ移行する。
  * すでに新形式なら手を加えない。
  */
+function migrateAreaIds(a: { areaIds?: string[]; areaId?: string }): string[] {
+  if (Array.isArray(a.areaIds)) return a.areaIds
+  if (typeof a.areaId === 'string' && a.areaId) return [a.areaId]
+  return []
+}
+
 function migrateAmenity(
-  a: Amenity & { count?: string; detail?: string; size?: string; manufacturer?: string; partNumber?: string },
+  a: Amenity & {
+    count?: string
+    detail?: string
+    size?: string
+    manufacturer?: string
+    partNumber?: string
+    areaId?: string
+    photoUrl?: string
+    groupId?: string
+  },
 ): Amenity {
+  const groupId = typeof a.groupId === 'string' && a.groupId ? a.groupId : a.id
+
   if (
     typeof a.count === 'string' &&
     typeof a.detail === 'string' &&
@@ -65,11 +82,13 @@ function migrateAmenity(
   ) {
     return {
       id: a.id,
+      groupId,
       name: a.name,
       size: a.size,
-      areaId: a.areaId ?? '',
+      areaIds: migrateAreaIds(a),
       manufacturer: a.manufacturer,
       partNumber: a.partNumber,
+      photoUrl: typeof a.photoUrl === 'string' ? a.photoUrl : '',
       count: a.count,
       detail: a.detail,
       checked: !!a.checked,
@@ -78,11 +97,13 @@ function migrateAmenity(
   const { name, count, detail } = parseAmenityString(a.name)
   return {
     id: a.id,
+    groupId,
     name,
     size: typeof a.size === 'string' ? a.size : '',
-    areaId: typeof a.areaId === 'string' ? a.areaId : '',
+    areaIds: migrateAreaIds(a),
     manufacturer: typeof a.manufacturer === 'string' ? a.manufacturer : '',
     partNumber: typeof a.partNumber === 'string' ? a.partNumber : '',
+    photoUrl: typeof a.photoUrl === 'string' ? a.photoUrl : '',
     count,
     detail,
     checked: !!a.checked,
@@ -155,9 +176,27 @@ interface RoomsContextValue {
 
   addAmenity: (
     roomId: string,
-    data: { name: string; size?: string; manufacturer?: string; partNumber?: string; areaId?: string; count?: string; detail?: string },
+    data: {
+      name: string
+      size?: string
+      manufacturer?: string
+      partNumber?: string
+      areaIds?: string[]
+      photoUrl?: string
+      count?: string
+      detail?: string
+      /** この備品を同時に共有登録する他の部屋タイプID（areaIds・checked を除く項目が共有される） */
+      roomTypeIds?: string[]
+    },
   ) => void
-  updateAmenity: (roomId: string, amenityId: string, patch: Partial<Omit<Amenity, 'id'>>) => void
+  updateAmenity: (
+    roomId: string,
+    amenityId: string,
+    patch: Partial<Omit<Amenity, 'id' | 'groupId'>> & {
+      /** 共有先の部屋タイプIDを入れ替える場合に指定（自分の部屋タイプは自動的に含まれる） */
+      roomTypeIds?: string[]
+    },
+  ) => void
   deleteAmenity: (roomId: string, amenityId: string) => void
   toggleAmenity: (roomId: string, amenityId: string) => void
   moveAmenity: (roomId: string, amenityId: string, direction: 'up' | 'down') => void
@@ -277,33 +316,103 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     [patchRoom],
   )
 
-  const addAmenity = useCallback<RoomsContextValue['addAmenity']>(
-    (roomId, data) =>
-      patchRoom(roomId, (r) => ({
-        ...r,
-        amenities: [
-          ...r.amenities,
-          {
-            id: uid(),
-            name: data.name,
-            size: data.size ?? '',
-            manufacturer: data.manufacturer ?? '',
-            areaId: data.areaId ?? '',
-            partNumber: data.partNumber ?? '',
-            count: data.count ?? '',
-            detail: data.detail ?? '',
-            checked: false,
-          },
-        ],
-      })),
-    [patchRoom],
-  )
+  const addAmenity = useCallback<RoomsContextValue['addAmenity']>((roomId, data) => {
+    const groupId = uid()
+    const shared = {
+      name: data.name,
+      size: data.size ?? '',
+      manufacturer: data.manufacturer ?? '',
+      partNumber: data.partNumber ?? '',
+      photoUrl: data.photoUrl ?? '',
+      count: data.count ?? '',
+      detail: data.detail ?? '',
+    }
+    const targetRoomIds = new Set([roomId, ...(data.roomTypeIds ?? [])])
+    setRooms((prev) =>
+      prev.map((r) => {
+        if (!targetRoomIds.has(r.id)) return r
+        return {
+          ...r,
+          amenities: [
+            ...r.amenities,
+            {
+              id: uid(),
+              groupId,
+              ...shared,
+              // エリアは部屋タイプごとに異なるため、共有先には引き継がずそれぞれの部屋で設定してもらう
+              areaIds: r.id === roomId ? data.areaIds ?? [] : [],
+              checked: false,
+            },
+          ],
+        }
+      }),
+    )
+  }, [])
 
-  const updateAmenity = useCallback<RoomsContextValue['updateAmenity']>(
-    (roomId, amenityId, patch) =>
-      patchRoom(roomId, (r) => ({ ...r, amenities: r.amenities.map((a) => (a.id === amenityId ? { ...a, ...patch } : a)) })),
-    [patchRoom],
-  )
+  const updateAmenity = useCallback<RoomsContextValue['updateAmenity']>((roomId, amenityId, patch) => {
+    const { roomTypeIds, areaIds, checked, ...sharedPatch } = patch
+
+    setRooms((prev) => {
+      const source = prev.find((r) => r.id === roomId)?.amenities.find((a) => a.id === amenityId)
+      if (!source) return prev
+
+      const { groupId } = source
+      const desiredRoomIds = roomTypeIds ? new Set([roomId, ...roomTypeIds]) : null
+
+      return prev.map((r) => {
+        const hasGroupHere = r.amenities.some((a) => a.groupId === groupId)
+
+        if (r.id === roomId) {
+          return {
+            ...r,
+            amenities: r.amenities.map((a) =>
+              a.id === amenityId
+                ? {
+                    ...a,
+                    ...sharedPatch,
+                    ...(areaIds !== undefined ? { areaIds } : {}),
+                    ...(checked !== undefined ? { checked } : {}),
+                  }
+                : a,
+            ),
+          }
+        }
+
+        // 共有先から外された部屋タイプ：この部屋の分だけ削除
+        if (desiredRoomIds && hasGroupHere && !desiredRoomIds.has(r.id)) {
+          return { ...r, amenities: r.amenities.filter((a) => a.groupId !== groupId) }
+        }
+
+        // 既存の共有先：共通項目のみ反映（エリア・チェック状態はそれぞれ独立のまま）
+        if (hasGroupHere) {
+          if (Object.keys(sharedPatch).length === 0) return r
+          return {
+            ...r,
+            amenities: r.amenities.map((a) => (a.groupId === groupId ? { ...a, ...sharedPatch } : a)),
+          }
+        }
+
+        // 新たに共有先に追加された部屋タイプ：現在の共通項目で新規レコードを作成
+        if (desiredRoomIds && desiredRoomIds.has(r.id)) {
+          return {
+            ...r,
+            amenities: [
+              ...r.amenities,
+              {
+                ...source,
+                ...sharedPatch,
+                id: uid(),
+                areaIds: [],
+                checked: false,
+              },
+            ],
+          }
+        }
+
+        return r
+      })
+    })
+  }, [])
 
   const deleteAmenity = useCallback<RoomsContextValue['deleteAmenity']>(
     (roomId, amenityId) => patchRoom(roomId, (r) => ({ ...r, amenities: r.amenities.filter((a) => a.id !== amenityId) })),

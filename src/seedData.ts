@@ -9,9 +9,10 @@ type AreaSeed = Omit<Area, 'id'>
 type AmenitySeed = {
   name: string
   size?: string
-  areaId?: string
+  areaIds?: string[]
   manufacturer?: string
   partNumber?: string
+  photoUrl?: string
   count: string
   detail: string
 }
@@ -45,8 +46,8 @@ const am = (
   size = '',
   manufacturer = '',
   partNumber = '',
-  areaId = '',
-): AmenitySeed => ({ name, size, areaId, manufacturer, partNumber, count, detail })
+  areaIds: string[] = [],
+): AmenitySeed => ({ name, size, areaIds, manufacturer, partNumber, count, detail })
 
 const ROOM_SEEDS: RoomSeed[] = [
   {
@@ -287,16 +288,21 @@ export function createSeedRooms(): RoomType[] {
     photoUrl: '',
     floorPlanImageUrl: '',
     areas: r.areas.map((a): Area => ({ id: uid(), ...a })),
-    amenities: r.amenities.map((a): Amenity => ({
-      id: uid(),
-      name: a.name,
-      size: a.size ?? '',
-      areaId: a.areaId ?? '',
-      manufacturer: a.manufacturer ?? '',
-      partNumber: a.partNumber ?? '',
-      count: a.count,
-      detail: a.detail,
-      checked: false,
-    })),
+    amenities: r.amenities.map((a): Amenity => {
+      const id = uid()
+      return {
+        id,
+        groupId: id,
+        name: a.name,
+        size: a.size ?? '',
+        areaIds: a.areaIds ?? [],
+        photoUrl: a.photoUrl ?? '',
+        manufacturer: a.manufacturer ?? '',
+        partNumber: a.partNumber ?? '',
+        count: a.count,
+        detail: a.detail,
+        checked: false,
+      }
+    }),
   }))
 }
